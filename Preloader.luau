@@ -1,79 +1,51 @@
---!strict
+--[[
+	MAKE: @BinTranDEV
+--]]
 
--- Wait until game loaded
+local ReplicatedFirst = game:GetService("ReplicatedFirst")
+local ContentProvider = game:GetService("ContentProvider")
+local Players = game:GetService("Players")
+
 if not game:IsLoaded() then
 	game.Loaded:Wait()
 end
 
--- [[ Services ]]
-local ContentProvider = game:GetService("ContentProvider")
+local player = Players.LocalPlayer
 
--- [[ Variables ]]
-local StartupTime = tick()
+-- Remove default loading screen nếu muốn
+pcall(function()
+	ReplicatedFirst:RemoveDefaultLoadingScreen()
+end)
 
-local AllAssets = {}
-local ToLoadAssets = {}
-
--- Loadable assets
-local ClassOnly = {
-	Decal = { "Texture" },
-	Texture = { "Texture" },
-	ImageLabel = { "Image" },
-	ImageButton = { "Image" },
-	MeshPart = { "MeshId", "TextureID" },
-	SpecialMesh = { "MeshId", "TextureId" },
-	Sound = { "SoundId" },
-	VideoFrame = { "Video" },
-	Animation = { "AnimationId" },
-	ParticleEmitter = { "Texture" },
-	Trail = { "Texture" },
-	Beam = { "Texture" },
-	SurfaceAppearance = { "NormalMap", "MetalnessMap", "RoughnessMap" },
-	MaterialVariant = { "NormalMap", "MetalnessMap", "RoughnessMap" },
-	Sky = { "SkyboxBk", "SkyboxDn", "SkyboxFt", "SkyboxLf", "SkyboxRt", "SkyboxUp" },
-	Fire = { "Heat", "Size" },
-	Smoke = { "Opacity" },
+local CLASS_PROPERTIES: {[string]: {string}} = {
+	ImageLabel = {"Image"},
+	ImageButton = {"Image"},
+	Decal = {"Texture"},
+	Texture = {"Texture"},
+	MeshPart = {"MeshId","TextureID"},
+	Sound = {"SoundId"},
+	Animation = {"AnimationId"},
+	ParticleEmitter = {"Texture"},
+	Trail = {"Texture"},
+	Beam = {"Texture"},
 }
 
--- [[ Functions ]]
-function GetAssets(container: Instance): ()
-	for _, obj: Instance in container:GetDescendants() do
-		if ClassOnly[obj.ClassName] ~= nil then
-			for __, property: string in ClassOnly[obj.ClassName] do
-				pcall(function()
-					if obj[property] ~= "" and typeof(obj[property]) == "string" then
-						AllAssets[obj[property]] = obj.Name
-					end
-				end)
-			end
-			table.insert(ToLoadAssets, obj)
+local function collect(container: Instance, list: {Instance})
+	for _, obj in container:GetDescendants() do
+		if CLASS_PROPERTIES[obj.ClassName] then
+			table.insert(list, obj)
 		end
 	end
 end
 
-function CallbackFunction(assetid: string, status: Enum.AssetFetchStatus): ()
-	if status == Enum.AssetFetchStatus.Success or status == Enum.AssetFetchStatus.None or status == Enum.AssetFetchStatus.Loading then
-		return nil
-	end
-	if AllAssets[assetid] then
-		warn(`[Preloader] {AllAssets[assetid]} ({assetid}) loaded failed.`)
-	else
-		warn(`[Preloader] an unknown asset loaded failed.`)
-	end
-end
+local start = os.clock()
 
-print(`[Preloader] loading all assets.`)
+local toLoad = {}
 
-GetAssets(workspace)
-GetAssets(game.ReplicatedStorage)
-GetAssets(game.StarterGui)
-GetAssets(game.SoundService)
-GetAssets(game.Lighting)
+collect(game.ReplicatedStorage, toLoad)
+collect(game.StarterGui, toLoad)
+collect(game.SoundService, toLoad)
 
-ContentProvider:PreloadAsync(ToLoadAssets, CallbackFunction)
+ContentProvider:PreloadAsync(toLoad)
 
-print(`[Preloader] loaded all assets in {tick() - StartupTime} ms.`)
-
--- Cleanup memory
-ToLoadAssets = nil
-AllAssets = nil
+print("Preload done in", math.floor((os.clock()-start)*1000), "ms")
